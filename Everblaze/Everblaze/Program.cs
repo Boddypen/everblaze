@@ -17,7 +17,7 @@ namespace Everblaze
         {
 			
 			// Run the game.
-            using (Game game = new Game("124.169.140.129"))
+            using (Game game = new Game("localhost"))
             {
                 game.Run();
             }
