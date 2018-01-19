@@ -7,7 +7,12 @@ namespace Everblaze
 
     public static class Program
     {
-		
+
+		/// <summary>
+		///		A Random Number Generator.
+		/// </summary>
+		public static Random random;
+
         /// 
 		/// <summary>
         ///		The main entry point for the application.
@@ -15,7 +20,11 @@ namespace Everblaze
 		/// 
         public static void Main(string[] args)
         {
-			
+
+			// Initialise the random number generator.
+			Program.random = new Random();
+
+
 			// Run the game.
             using (Game game = new Game("localhost"))
             {

@@ -13,11 +13,10 @@ namespace Everblaze.Environment.Tiles
 	public class DirtTile : Tile
 	{
 
-		public DirtTile(Random random) : base(random)
+		public DirtTile() : base()
 		{
 			this.networkID = NETWORK_DIRT;
-
-
+			
 			this.slipperiness = 0.77F;
 		}
 		
@@ -26,6 +25,7 @@ namespace Everblaze.Environment.Tiles
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
 			Camera camera,
+			World world,
 			Int32 tileX,
 			Int32 tileZ)
 		{
@@ -52,11 +52,11 @@ namespace Everblaze.Environment.Tiles
 			base.addActions(ref actionList, tilePosition, skills, tool);
 		}
 
-		public override void onDig(Random random, SkillSet skills, World world, Int32 tileX, Int32 tileZ)
+		public override void onDig(SkillSet skills, World world, Int32 tileX, Int32 tileZ)
 		{
-			world.player.inventory.items.Add(new DirtItem(Item.Material.None, (float)random.NextDouble() * skills.digging.level, 0.0F));
-
-			base.onDig(random, skills, world, tileX, tileZ);
+			world.player.inventory.store(new DirtItem(Item.Material.None, (float)Program.random.NextDouble() * skills.digging.level, 0.0F));
+			
+			base.onDig(skills, world, tileX, tileZ);
 		}
 
 		public override String getDescription()

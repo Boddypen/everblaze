@@ -36,7 +36,7 @@ namespace Everblaze.Environment.Tiles
 		///		Initializes a new instance of the <see cref="TreeTile"/> class.
 		/// </summary>
 		/// 
-		public TreeTile(Random random) : base(random)
+		public TreeTile() : base()
 		{
 			this.networkID = NETWORK_TREE;
 
@@ -45,20 +45,70 @@ namespace Everblaze.Environment.Tiles
 
 
 			// Make all tree tiles have a random chance of starting foragable.
-			this.fruitful = (random.Next(2) == 0);
+			this.fruitful = (Program.random.Next(2) == 0);
 
+			this.diggable = false;
 
 			// Start the tree's growth at 0.
 			this.growthLevel = 0;
 			
 
 			// Randomise the tree's position on the tile.
-			this.treeCorner = Tile.getRandomCorner(random);
-			this.treeRotation = MathHelper.ToRadians((float)random.NextDouble() * 360.0F);
+			this.treeCorner = Tile.getRandomCorner();
+			this.treeRotation = MathHelper.ToRadians((float)Program.random.NextDouble() * 360.0F);
 
 		}
 
-		public override void readCustomProperties(ref NetIncomingMessage message)
+
+		#region Networking & File Storage
+
+		public override void readCustomFileProperties(String[] customProperties)
+		{
+			this.fruitful = Boolean.Parse(customProperties[0]);
+
+			this.treeRotation = float.Parse(customProperties[1]);
+
+			switch (int.Parse(customProperties[2]))
+			{
+				case 0:
+					this.treeCorner = TileCorner.TopLeft;
+					break;
+
+				case 1:
+					this.treeCorner = TileCorner.TopRight;
+					break;
+
+				case 2:
+					this.treeCorner = TileCorner.BottomLeft;
+					break;
+
+				case 3:
+					this.treeCorner = TileCorner.BottomRight;
+					break;
+			}
+
+
+			base.readCustomFileProperties(customProperties);
+		}
+
+		public override String getCustomFileProperties()
+		{
+			int treeCornerInteger = 0;
+			switch (this.treeCorner)
+			{
+				case TileCorner.TopLeft: treeCornerInteger = 0; break;
+				case TileCorner.TopRight: treeCornerInteger = 1; break;
+				case TileCorner.BottomLeft: treeCornerInteger = 2; break;
+				case TileCorner.BottomRight: treeCornerInteger = 3; break;
+			}
+
+			return this.fruitful.ToString() + (char)0xFF
+				 + this.treeRotation.ToString() + (char)0xFF
+				 + treeCornerInteger;
+		}
+
+
+		public override void readCustomNetworkProperties(ref NetIncomingMessage message)
 		{
 			this.fruitful = message.ReadBoolean();
 
@@ -83,7 +133,7 @@ namespace Everblaze.Environment.Tiles
 					break;
 			}
 
-			base.readCustomProperties(ref message);
+			base.readCustomNetworkProperties(ref message);
 		}
 
 
@@ -115,6 +165,8 @@ namespace Everblaze.Environment.Tiles
 			base.writeCustomProperties(ref message);
 		}
 
+		#endregion
+
 
 		/// 
 		/// <summary>
@@ -125,6 +177,7 @@ namespace Everblaze.Environment.Tiles
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
 			Camera camera,
+			World world,
 			Int32 tileX,
 			Int32 tileZ)
 		{
@@ -160,6 +213,7 @@ namespace Everblaze.Environment.Tiles
 					break;
 			}
 			treePosition *= Tile.TILE_WIDTH;
+			
 
 			ModelResources.renderModel(
 				ModelResources.treeModel,

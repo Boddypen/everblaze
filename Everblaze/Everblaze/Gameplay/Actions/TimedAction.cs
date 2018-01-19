@@ -10,6 +10,8 @@ using Everblaze.Environment.Tiles;
 using Everblaze.Environment.Items;
 using Everblaze.Interface;
 using Lidgren.Network;
+using Microsoft.Xna.Framework;
+using Everblaze.Miscellaneous;
 
 namespace Everblaze.Gameplay.Actions
 {
@@ -37,20 +39,18 @@ namespace Everblaze.Gameplay.Actions
 		///		Performs the action (finally!).
 		/// </summary>
 		/// 
-		/// <param name="random">A random number generator.</param>
 		/// <param name="client">The network client that represents the game.</param>
 		/// <param name="world">The world object.</param>
 		/// <param name="skills">The skillset of the player performing the action.</param>
 		/// 
 		public void perform(
-			Random random,
 			NetClient client,
 			World world,
 			SkillSet skills,
 			ref List<Notification> notifications)
 		{
 
-			Boolean fail = random.NextDouble() > action.chance;
+			Boolean fail = Program.random.NextDouble() > action.chance;
 			
 			
 			switch(action.operation)
@@ -60,21 +60,38 @@ namespace Everblaze.Gameplay.Actions
 
 					if (fail) break;
 
-					notifications.Add(new Notification(world.tiles[action.tileTarget.X, action.tileTarget.Y].getDescription()));
+					switch (action.targetType)
+					{
+						case Action.TargetType.Tile:
+							notifications.Add(new Notification(world.tiles[action.tileTarget.X, action.tileTarget.Y].getDescription()));
+							break;
+
+						case Action.TargetType.Item:
+							notifications.Add(new Notification(action.targetItem.getDescription()));
+							break;
+					}
+
 					break;
 				
 
 				case Action.Operation.Dig:
 
-					skills.digging.increase(random, notifications);
-
-					if (fail) break;
+					skills.digging.increase(notifications);
 
 					// Determine the tile the point is on top of.
+					//TODO: Move this outside of the switch, so all 'cases' have access to it.
 					int tileX = (int)(world.player.position.X / Tile.TILE_WIDTH);
 					int tileZ = (int)(world.player.position.Z / Tile.TILE_WIDTH);
 
+					// Force the player to fail if they're digging on a tile which doesn't allow it.
+					fail = !world.tiles[tileX, tileZ].diggable;
 
+					if (fail)
+					{
+						notifications.Add(new Notification("The ground is too hard to dig."));
+						break;
+					}
+					
 					// Now that we know the tile we're on, we need to find the quadrant.
 					float tilePositionX = (world.player.position.X - (float)(tileX * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
 					float tilePositionZ = (world.player.position.Z - (float)(tileZ * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
@@ -85,7 +102,7 @@ namespace Everblaze.Gameplay.Actions
 					else if (tilePositionX < 0.5F && tilePositionZ >= 0.5F) currentCorner = Tile.TileCorner.BottomLeft;
 					else if (tilePositionX >= 0.5F && tilePositionZ >= 0.5F) currentCorner = Tile.TileCorner.BottomRight;
 
-					world.tiles[tileX, tileZ].onDig(random, skills, world, tileX, tileZ);
+					world.tiles[tileX, tileZ].onDig(skills, world, tileX, tileZ);
 
 					world.changeHeight(tileX, tileZ, currentCorner, -1);
 
@@ -101,14 +118,14 @@ namespace Everblaze.Gameplay.Actions
 						for (int z = minZ; z <= maxZ; z++)
 							updateTile(world, client, x, z);
 
-					notifications.Add(new Notification("You excavate some dirt."));
+					notifications.Add(new Notification("You excavate some " + world.tiles[tileX, tileZ].getName() + "."));
 
 					break;
 
 
 				case Action.Operation.Forage:
 
-					skills.foraging.increase(random, notifications);
+					skills.foraging.increase(notifications);
 
 					if (fail)
 					{
@@ -116,9 +133,9 @@ namespace Everblaze.Gameplay.Actions
 						break;
 					}
 
-					Item foragedItem = Item.generateForagedItem(random);
+					Item foragedItem = Item.generateForagedItem();
 
-					world.player.inventory.items.Add(foragedItem);
+					world.player.inventory.store(foragedItem);
 					world.tiles[action.tileTarget.X, action.tileTarget.Y].fruitful = false;
 					updateTile(world, client, action.tileTarget.X, action.tileTarget.Y);
 
@@ -129,12 +146,12 @@ namespace Everblaze.Gameplay.Actions
 
 				case Action.Operation.Cultivate:
 
-					skills.farming.increase(random, notifications);
-					skills.digging.increase(random, notifications);
+					skills.farming.increase(notifications);
+					skills.digging.increase(notifications);
 
 					if (fail) break;
 
-					world.replaceTile(action.tileTarget.X, action.tileTarget.Y, new DirtTile(random));
+					world.replaceTile(action.tileTarget.X, action.tileTarget.Y, new DirtTile());
 					updateTile(world, client, action.tileTarget.X, action.tileTarget.Y);
 
 					notifications.Add(new Notification("The tile is now cultivated."));
@@ -144,11 +161,11 @@ namespace Everblaze.Gameplay.Actions
 
 				case Action.Operation.CutDown:
 
-					skills.woodcutting.increase(random, notifications);
+					skills.woodcutting.increase(notifications);
 
 					if (fail) break;
 
-					world.replaceTile(action.tileTarget.X, action.tileTarget.Y, new GrassTile(random));
+					world.replaceTile(action.tileTarget.X, action.tileTarget.Y, new GrassTile());
 
 					notifications.Add(new Notification("You cut down the tree."));
 
@@ -178,27 +195,11 @@ namespace Everblaze.Gameplay.Actions
 		{
 			NetOutgoingMessage tileUpdate = client.CreateMessage();
 			tileUpdate.Write(Game.NETWORK_TILE_UPDATE_REQUEST);
-			writeTileData(world, tileX, tileZ, ref tileUpdate);
+			NetworkHelper.writeTileData(world, tileX, tileZ, ref tileUpdate);
 
 			client.SendMessage(tileUpdate, NetDeliveryMethod.ReliableOrdered);
 		}
-
-		public void writeTileData(World world, int tileX, int tileZ, ref NetOutgoingMessage message)
-		{
-			message.Write(tileX);
-			message.Write(tileZ);
-
-			message.Write(world.tiles[tileX, tileZ].networkID);
-
-			int[] heights = world.tiles[tileX, tileZ].heights;
-			message.Write(heights[0]);
-			message.Write(heights[1]);
-			message.Write(heights[2]);
-			message.Write(heights[3]);
-
-			world.tiles[tileX, tileZ].writeCustomProperties(ref message);
-		}
-
+		
 
 		public void calculateTime(SkillSet skills)
 		{

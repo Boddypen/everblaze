@@ -1,0 +1,12 @@
+data\spritefont\interface.xnb
+data\spritefont\notification.xnb
+data\png\environment\tiles\slab.xnb
+data\png\environment\tiles\grass.xnb
+data\png\environment\tiles\dirt.xnb
+data\png\environment\tiles\cursor.xnb
+data\png\interface\cursor.xnb
+data\png\interface\action_menu.xnb
+data\png\interface\white.xnb
+data\png\environment\tiles\farmland.xnb
+data\fbx\debug\pointer.xnb
+data\fbx\environment\tree.xnb

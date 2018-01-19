@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+
 using Everblaze.Environment.Items;
 using Everblaze.Gameplay.Skills;
+
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+
 
 namespace Everblaze.Environment.Entities
 {
@@ -29,6 +32,19 @@ namespace Everblaze.Environment.Entities
 		/// </summary>
 		public Container inventory;
 
+		/// <summary>
+		///		The index of the currently active item in the player's inventory.
+		///		Can be <c>-1</c> to indicate no active item.
+		/// </summary>
+		public int activeItem = -1;
+		
+
+		/// <summary>
+		///		The item in the player's hand.
+		///		May be <c>null</c>.
+		/// </summary>
+		public Item heldItem;
+
 
 		/// 
 		/// <summary>
@@ -42,7 +58,11 @@ namespace Everblaze.Environment.Entities
 
 			this.skills = new SkillSet(1.0F);
 
-			this.inventory = new Container(64);
+			this.inventory = new Container(200.0F, 100);
+
+			this.heldItem = null;
+
+			this.inventory.store(new ShovelItem(Item.Material.Rock, 10.0F, 0.0F));
 
 		}
 
@@ -53,7 +73,6 @@ namespace Everblaze.Environment.Entities
 		/// </summary>
 		/// 
 		public void update(
-			Random random,
 			World world,
 			KeyboardState k,
 			Vector2 lookMovement)
@@ -89,9 +108,9 @@ namespace Everblaze.Environment.Entities
 			// Update the player's eyes
 			this.pitch -= lookMovement.Y * Game.lookSensitivity;
 			this.yaw += lookMovement.X * Game.lookSensitivity;
-
 			
-			base.update(random, world);
+			
+			base.update(world);
 		}
 
 	}

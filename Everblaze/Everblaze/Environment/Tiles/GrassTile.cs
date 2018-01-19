@@ -24,7 +24,7 @@ namespace Everblaze.Environment.Tiles
 		///		Initializes a new instance of the <see cref="GrassTile"/> class.
 		/// </summary>
 		/// 
-		public GrassTile(Random random) : base(random)
+		public GrassTile() : base()
 		{
 			this.networkID = NETWORK_GRASS;
 
@@ -32,7 +32,7 @@ namespace Everblaze.Environment.Tiles
 			this.slipperiness = 0.72F;
 
 			// Make all grass tiles have a random chance of starting foragable.
-			this.fruitful = (random.Next(2) == 0);
+			this.fruitful = (Program.random.Next(2) == 0);
 		}
 
 
@@ -49,11 +49,22 @@ namespace Everblaze.Environment.Tiles
 
 			base.writeCustomProperties(ref message);
 		}
-		public override void readCustomProperties(ref NetIncomingMessage message)
+		public override void readCustomNetworkProperties(ref NetIncomingMessage message)
 		{
 			this.fruitful = message.ReadBoolean();
 
-			base.readCustomProperties(ref message);
+			base.readCustomNetworkProperties(ref message);
+		}
+
+		public override void readCustomFileProperties(String[] customProperties)
+		{
+			this.fruitful = Boolean.Parse(customProperties[0]);
+
+			base.readCustomFileProperties(customProperties);
+		}
+		public override String getCustomFileProperties()
+		{
+			return this.fruitful.ToString();
 		}
 
 
@@ -66,6 +77,7 @@ namespace Everblaze.Environment.Tiles
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
 			Camera camera,
+			World world,
 			int tileX,
 			int tileZ)
 		{
@@ -116,17 +128,17 @@ namespace Everblaze.Environment.Tiles
 		/// </summary>
 		/// 
 		public override void onDig(
-			Random random,
 			SkillSet skills,
 			World world,
 			int tileX,
 			int tileZ)
 		{
-			world.replaceTile(tileX, tileZ, new DirtTile(random));
+			
+			world.replaceTile(tileX, tileZ, new DirtTile());
 
-			world.player.inventory.items.Add(new DirtItem(Item.Material.None, (float)random.NextDouble() * skills.digging.level, 0.0F));
+			world.player.inventory.store(new DirtItem(Item.Material.None, (float)Program.random.NextDouble() * skills.digging.level, 0.0F));
 
-			base.onDig(random, skills, world, tileX, tileZ);
+			base.onDig(skills, world, tileX, tileZ);
 		}
 
 

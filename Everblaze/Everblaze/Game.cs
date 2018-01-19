@@ -5,6 +5,7 @@ using System.Threading;
 
 using Everblaze.Environment;
 using Everblaze.Environment.Entities;
+using Everblaze.Environment.Items;
 using Everblaze.Environment.Tiles;
 using Everblaze.Gameplay.Actions;
 using Everblaze.Interface;
@@ -22,12 +23,12 @@ using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
 
 
-//IDEAS: So the inventory is always hidden, only shows when pressing TAB to bring up the big inventory screen.
-//IDEAS: When items are added into the inventory, display a message in the top-right corner, which fades away. e.g. "Corn added"
 //IDEAS: When skill milestones are reached, e.g. Foraging 25, Digging 50, Masonry 75, etc: Display a message notifying the player they have reached a new tier of that skill. These could be called 'Novice', 'Apprentice', etc like in skyrim or oblivion.
+//IDEAS: Water & Swimming
 
 //TODO: Jumping
 //TODO: Sprinting
+//TODO: Stack notifications when there are too many
 
 //SHIT: Large worlds crash the UDP system due to a single, large message (split up the world into small sections?)
 
@@ -41,8 +42,8 @@ namespace Everblaze
 	/// </summary>
 	/// 
 	/// <remarks>
-	///		Created by Marcus Kirkwood, 2017
-	///		Software Design and Development
+	///		Created by Marcus Kirkwood, 2017-2018
+	///		for a Software Design and Development
 	///		Major HSC Project
 	/// </remarks>
 	/// 
@@ -73,17 +74,36 @@ namespace Everblaze
 		/// </summary>
 		public const int SCALE = 1;
 
-		
+
 		public const int
 			NETWORK_REFRESH_REQUEST = 0,
 			NETWORK_REFRESH_RESPONSE = 1,
 			NETWORK_TILE_UPDATE_REQUEST = 2,
-			NETWORK_TILE_UPDATE_RESPONSE = 3;
+			NETWORK_TILE_UPDATE_RESPONSE = 3,
+			NETWORK_NEW_ITEM_REQUEST = 4,
+			NETWORK_NEW_ITEM_RESPONSE = 5;
 
 		#endregion
 
 
 		#region Enumerables
+
+		/// <summary>
+		///		The 'side' which the current instance is running from.
+		/// </summary>
+		public enum GameSide
+		{
+			/// <summary>
+			///		Running as a client.
+			/// </summary>
+			Client,
+
+			/// <summary>
+			///		Running on a server.
+			/// </summary>
+			Server
+		}
+
 
 		/// <summary>
 		///		The state in which the game is current running in.
@@ -132,7 +152,7 @@ namespace Everblaze
 
 
 		// The sensitivity of looking around in the 3D environment.
-		public static float lookSensitivity = 0.50F;
+		public static float lookSensitivity = 0.25F;
 
 		// Whether or not the mouse cursor is locked to the centre of the screen.
 		public Boolean mouseLocked = true;
@@ -167,10 +187,7 @@ namespace Everblaze
 
 
 		#region Data
-
-		// RNG
-		private Random random;
-
+		
 		/// <summary>
 		///		The game world.
 		/// </summary>
@@ -186,6 +203,11 @@ namespace Everblaze
 		// Indicator thing at the top of the screen.
 		public float indicatorOffset = 0.0F;
 
+		/// <summary>
+		///		The inventory's positional offset. This makes it slide to/from the edge of the screen.
+		/// </summary>
+		public float inventoryOffset = 700.0F;
+
 
 		/// <summary>
 		///		The action the player is currently performing.
@@ -199,6 +221,12 @@ namespace Everblaze
 		///		<see cref="GameState.Running"/> and <see cref="GameState.RunningInventory"/>.
 		/// </summary>
 		public Boolean canToggleInventory = true;
+
+		/// <summary>
+		///		Whether or not the player can select an item in their inventory or in a container.
+		///		This will be reset to <c>true</c> upon the release of the mouse button.
+		/// </summary>
+		public Boolean canSelectItem = true;
 		
 		#endregion
 
@@ -249,6 +277,7 @@ namespace Everblaze
 		
 		#endregion
 
+
 		/// 
 		/// <summary>
 		///		Initializes a new instance of the <see cref="Game"/> class.
@@ -258,26 +287,23 @@ namespace Everblaze
 		/// 
 		public Game(String IP)
 		{
-
-			// Create the most important thing in the entire game - the RNG.
-			random = new Random();
-
-
+			
 			// Set up the graphics device manager.
 			graphics = new GraphicsDeviceManager(this);
 
-			// Set the initial window size to a 4:3 window.
-			graphics.PreferredBackBufferWidth = 1024;
-			graphics.PreferredBackBufferHeight = 768;
-			graphics.IsFullScreen = false;
+			// Set the initial window size...
+			graphics.PreferredBackBufferWidth = 1920;
+			graphics.PreferredBackBufferHeight = 1080;
+			graphics.IsFullScreen = true;
 
 
 			// Set the content root directory.
 			Content.RootDirectory = "data";
+			
 
 			// Make sure the cursor is visible...
 			this.IsMouseVisible = true;
-
+			
 
 			#region Networking Setup
 
@@ -344,13 +370,13 @@ namespace Everblaze
 									existingPlayer = world.player;
 
 
-								world = new World(random, worldWidth, worldHeight);
+								world = new World(worldWidth, worldHeight);
 
 								for(int x = 0; x < worldWidth; x++)
 								{
 									for(int z = 0; z < worldHeight; z++)
 									{
-										world.tiles[x, z] = Tile.readFromNetwork(random, ref message);
+										world.tiles[x, z] = Tile.readFromNetwork(ref message);
 									}
 								}
 
@@ -366,7 +392,19 @@ namespace Everblaze
 								int tileX = message.ReadInt32();
 								int tileZ = message.ReadInt32();
 
-								world.tiles[tileX, tileZ] = Tile.readFromNetwork(random, ref message);
+								world.tiles[tileX, tileZ] = Tile.readFromNetwork(ref message);
+
+								break;
+
+							// Item Update
+							case NETWORK_NEW_ITEM_RESPONSE:
+
+								float itemX = message.ReadFloat();
+								float itemZ = message.ReadFloat();
+
+								Item receivedItem = Item.readFromNetwork(ref message);
+								receivedItem.position = new Vector2(itemX, itemZ);
+								world.items.Add(receivedItem);
 
 								break;
 						}
@@ -428,6 +466,11 @@ namespace Everblaze
 			mOld = m;
 
 
+			//TEMP: Barrel on spawn.
+			SmallBarrelItem barrel = new SmallBarrelItem(Item.Material.OakWood, 25.00F, 0.00F);
+			NetworkHelper.addNewItem(barrel, client);
+
+
 			base.Initialize();
 		}
 
@@ -468,7 +511,9 @@ namespace Everblaze
 			// Get the keyboard/mouse states.
 			k = Keyboard.GetState();
 			m = Mouse.GetState();
-			
+
+			IsMouseVisible = !mouseLocked;
+
 			// Make sure the game switches to an unfocused state when not active.
 			
 			if (!this.IsActive)
@@ -477,16 +522,6 @@ namespace Everblaze
 				{
 					this.gameState = GameState.Unfocused;
 				}
-
-				this.IsMouseVisible = true;
-			}
-			else if(gameState.Equals(GameState.RunningInventory))
-			{
-				this.IsMouseVisible = true;
-			}
-			else
-			{
-				this.IsMouseVisible = false;
 			}
 
 
@@ -564,7 +599,7 @@ namespace Everblaze
 							
 							// Find out how far the mouse has moved since the last upate.
 							Vector2 lookMovement = Vector2.Zero;
-							if (mouseLocked)
+							if (mouseLocked && gameState.Equals(GameState.Running))
 							{
 								lookMovement = new Vector2(
 									m.X - (graphics.PreferredBackBufferWidth / 2),
@@ -575,7 +610,7 @@ namespace Everblaze
 							// Update the world.
 							if (world != null)
 							{
-								world.update(random, k, lookMovement);
+								world.update(GameSide.Client, k, lookMovement);
 							}
 
 							// Update the current action.
@@ -583,7 +618,7 @@ namespace Everblaze
 							{
 								if (currentAction.tick())
 								{
-									currentAction.perform(random, client, world, world.player.skills, ref notifications);
+									currentAction.perform(client, world, world.player.skills, ref notifications);
 									currentAction = null;
 								}
 							}
@@ -637,55 +672,72 @@ namespace Everblaze
 
 
 					// Allow the context menu to be opened
-					if (m.RightButton.Equals(ButtonState.Pressed)
-						&& canOpenContextMenu
-						&& tileCursorEnabled)
+					if (gameState.Equals(GameState.Running)
+						|| gameState.Equals(GameState.RunningInventory))
 					{
-						contextMenu = new ContextMenu(world.player.skills, tileCursorPosition, world, null);
-
-						mouseLocked = false;
-						canOpenContextMenu = false;
-					}
-
-					if (contextMenu == null
-						&& m.RightButton.Equals(ButtonState.Released))
-					{
-						canOpenContextMenu = true;
-					}
-
-
-					// Allow the context menu to be closed, if clicked away from.
-					// Also, update the context menu.
-					if (contextMenu != null)
-					{
-						// Update the context menu.
-						int result = contextMenu.update(m, graphics);
-
-						if (result >= 0)
+						if (m.RightButton.Equals(ButtonState.Pressed)
+							&& canOpenContextMenu
+							&& tileCursorEnabled)
 						{
-							if (currentAction == null)
-							{
-								currentAction = new TimedAction(contextMenu.actionList[result], world.player.skills);
+							contextMenu = new ContextMenu(
+								world.player.skills,
+								tileCursorPosition,
+								world,
+								null);
 
-								contextMenu = null;
-								mouseLocked = true;
-							}
+							mouseLocked = false;
+							canOpenContextMenu = false;
 						}
-						else
+						
+
+						if (contextMenu == null
+							&& m.RightButton.Equals(ButtonState.Released))
 						{
-							// Then allow the menu to be closed.
-							Rectangle contextMenuRectangle = contextMenu.calculateSize(FontResources.interfaceFont, graphics);
-							if (m.LeftButton.Equals(ButtonState.Pressed)
-								&&
-								(
-									m.X < contextMenuRectangle.Left ||
-									m.X > contextMenuRectangle.Right ||
-									m.Y < contextMenuRectangle.Top ||
-									m.Y > contextMenuRectangle.Bottom
-								))
+							canOpenContextMenu = true;
+						}
+
+
+						// Allow the context menu to be closed, if clicked away from.
+						// Also, update the context menu.
+						if (contextMenu != null)
+						{
+							// Update the context menu.
+							int result = contextMenu.update(m, graphics);
+
+							if (result >= 0)
 							{
-								contextMenu = null;
-								mouseLocked = true;
+								if (currentAction == null)
+								{
+									currentAction = new TimedAction(contextMenu.actionList[result], world.player.skills);
+
+									contextMenu = null;
+
+									if(gameState.Equals(GameState.Running))
+										mouseLocked = true;
+								}
+								else
+								{
+									//TODO: Allow actions to stack.
+								}
+							}
+							else
+							{
+								// Then allow the menu to be closed.
+								Rectangle contextMenuRectangle = contextMenu.calculateSize(FontResources.interfaceFont, graphics);
+								if (m.LeftButton.Equals(ButtonState.Pressed)
+									&&
+									(
+										m.X < contextMenuRectangle.Left ||
+										m.X > contextMenuRectangle.Right ||
+										m.Y < contextMenuRectangle.Top ||
+										m.Y > contextMenuRectangle.Bottom
+									))
+								{
+									contextMenu = null;
+
+									if(gameState.Equals(GameState.Running))
+										mouseLocked = true;
+								}
 							}
 						}
 					}
@@ -696,17 +748,11 @@ namespace Everblaze
 					#region Mouse Looking
 
 					// Reset the mouse to the middle of the screen.
-					if (mouseLocked)
+					if (mouseLocked && gameState.Equals(GameState.Running))
 					{
 						Mouse.SetPosition(
 						graphics.PreferredBackBufferWidth / 2,
 						graphics.PreferredBackBufferHeight / 2);
-
-						IsMouseVisible = false;
-					}
-					else
-					{
-						IsMouseVisible = true;
 					}
 
 					#endregion
@@ -761,6 +807,33 @@ namespace Everblaze
 
 
 
+			#region Inventory Window & Such
+
+			if (gameState.Equals(GameState.RunningInventory))
+			{
+				
+				world.player.inventory.update(
+						Container.WindowStyle.Inventory,
+						graphics,
+						k,
+						m,
+						ref canSelectItem,
+						world,
+						client,
+						ref contextMenu);
+
+			}
+
+			if(world != null)
+			{
+				inventoryOffset += ((gameState.Equals(GameState.RunningInventory) ? 0.0F : 700.0F) - inventoryOffset) / 4.0F;
+				world.player.inventory.slideOffset = inventoryOffset;
+			}
+
+			#endregion
+
+
+
 			// Allow the inventory to be toggled.
 			#region Inventory Toggling
 
@@ -770,6 +843,10 @@ namespace Everblaze
 				if (canToggleInventory && k.IsKeyDown(Keys.Tab))
 				{
 					gameState = (gameState.Equals(GameState.Running) ? GameState.RunningInventory : GameState.Running);
+
+					mouseLocked = !gameState.Equals(GameState.RunningInventory);
+
+					contextMenu = null;
 
 					Mouse.SetPosition(graphics.PreferredBackBufferWidth / 2, graphics.PreferredBackBufferHeight / 2);
 
@@ -817,6 +894,7 @@ namespace Everblaze
 				DepthStencilState.Default,
 				RasterizerState.CullCounterClockwise);
 
+			GraphicsDevice.BlendState = BlendState.NonPremultiplied;
 
 
 			if (gameState.Equals(GameState.Running)
@@ -858,12 +936,17 @@ namespace Everblaze
 
 			}
 
-			if (gameState.Equals(GameState.Running))
+			if(gameState.Equals(GameState.Running)
+				|| gameState.Equals(GameState.RunningInventory))
 			{
 				// Draw the context menu
 				if (contextMenu != null)
 					contextMenu.draw(spriteBatch, FontResources.interfaceFont, graphics);
+			}
 
+
+			if (gameState.Equals(GameState.Running))
+			{
 				// Draw the little menu thing at the top of the screen which shows the current tile.
 				{
 					InterfaceHelper.drawWindow(
@@ -872,7 +955,8 @@ namespace Everblaze
 										-40 + (int)indicatorOffset,
 										200,
 										30),
-						1.0F);
+						1.0F,
+						0.5F);
 
 					if (tileCursorEnabled)
 					{
@@ -903,7 +987,8 @@ namespace Everblaze
 					InterfaceHelper.drawWindow(
 						spriteBatch,
 						new Rectangle(5, graphics.PreferredBackBufferHeight - 105, 300, 100),
-						0.80F);
+						0.80F,
+						0.5F);
 
 					spriteBatch.Draw(
 							TextureResources.contextMenuTexture,
@@ -968,21 +1053,20 @@ namespace Everblaze
 			}
 
 
-			if(gameState.Equals(GameState.RunningInventory))
+			if(gameState.Equals(GameState.RunningInventory)
+				|| gameState.Equals(GameState.Running))
 			{
-
-				Rectangle inventoryRectangle = new Rectangle(
-					(graphics.PreferredBackBufferWidth / 2) - 400,
-					(graphics.PreferredBackBufferHeight / 2) - 300,
-					800,
-					600);
-
-
-				InterfaceHelper.drawWindow(
+				
+				if(m.LeftButton.Equals(ButtonState.Released) && m.RightButton.Equals(ButtonState.Released))
+					canSelectItem = true;
+				
+				Container.draw(
+					Container.WindowStyle.Inventory,
+					ref world.player.inventory,
+					graphics,
 					spriteBatch,
-					inventoryRectangle,
-					0.85F);
-
+					"Inventory");
+				
 			}
 			
 
@@ -1048,7 +1132,8 @@ namespace Everblaze
 								  (graphics.PreferredBackBufferHeight / 2) - 40,
 								  (int)messageSize.X + 100,
 								  80),
-				1.0F);
+				1.0F,
+				0.5F);
 
 			spriteBatch.DrawString(FontResources.notificationFont,
 					message,

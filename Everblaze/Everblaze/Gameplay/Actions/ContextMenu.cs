@@ -35,21 +35,65 @@ namespace Everblaze.Gameplay.Actions
 		/// </summary>
 		public String title;
 
+		/// <summary>
+		///		The position of the context menu.
+		/// </summary>
+		public Point? position;
+
 
 		public float age = 0.0F;
 
 		
-		public ContextMenu(SkillSet skills, Point tileTarget, World world, Item item)
+		public ContextMenu(
+			SkillSet skills,
+			Point tileTarget,
+			World world,
+			Point? position)
 		{
 
 			actionList = new List<Action>();
 			
-			//HACK: Temporary ShovelItem override
-			world.tiles[tileTarget.X, tileTarget.Y].addActions(ref actionList, tileTarget, skills, new ShovelItem(Item.Material.Rock, 50.0f, 0.0F));
+			world.tiles[tileTarget.X, tileTarget.Y].addActions(
+				ref actionList,
+				tileTarget,
+				skills,
+				world.player.inventory.getSelectedItem());
 
 			this.title = world.tiles[tileTarget.X, tileTarget.Y].getName().ToUpper();
 
 			actionList.Reverse();
+
+
+			// If a custom position has been specified, set it.
+			if(position.HasValue)
+				this.position = position.Value;
+
+		}
+
+		public ContextMenu(
+			SkillSet skills,
+			ref Item targetItem,
+			World world,
+			Item item,
+			Point? position)
+		{
+
+			actionList = new List<Action>();
+
+			targetItem.addActions(
+				ref actionList,
+				ref targetItem,
+				skills,
+				item);
+
+			this.title = targetItem.getName().ToUpper();
+
+			actionList.Reverse();
+
+
+			// If a custom position has been specified, set it.
+			if (position.HasValue)
+				this.position = position.Value;
 
 		}
 
@@ -116,7 +160,11 @@ namespace Everblaze.Gameplay.Actions
 
 			Rectangle size = new Rectangle();
 
-			size.X = (graphics.PreferredBackBufferWidth / 2) + 50;
+			if(position.HasValue)
+				size.X = position.Value.X + 50;
+			else
+				size.X = (graphics.PreferredBackBufferWidth / 2) + 50;
+
 
 			float maxWidth = 0.0F;
 			foreach(Action action in actionList)
@@ -135,7 +183,12 @@ namespace Everblaze.Gameplay.Actions
 
 			size.Height = (actionList.Count * 30) + 30 + 10;
 
-			size.Y = (graphics.PreferredBackBufferHeight / 2) - (size.Height / 2);
+
+			if (position.HasValue)
+				size.Y = position.Value.Y - (size.Height / 2);
+			else
+				size.Y = (graphics.PreferredBackBufferHeight / 2) - (size.Height / 2);
+
 
 			return size;
 
@@ -156,7 +209,7 @@ namespace Everblaze.Gameplay.Actions
 			Rectangle size = this.calculateSize(interfaceFont, graphics);
 			size.Location = new Point(size.X - (int)((1.0F - age) * 50.0F), size.Y);
 
-			InterfaceHelper.drawWindowWithArrow(spriteBatch, size, age);
+			InterfaceHelper.drawWindowWithArrow(spriteBatch, size, age, 0.2F);
 
 
 			for(int i = 0; i < actionList.Count; i++)

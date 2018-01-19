@@ -23,11 +23,10 @@ namespace Everblaze.Environment.Tiles
 		///		Initializes a new instance of the <see cref="FarmlandTile"/> class.
 		/// </summary>
 		/// 
-		public FarmlandTile(Random random) : base(random)
+		public FarmlandTile() : base()
 		{
 			this.networkID = NETWORK_FARMLAND;
-
-
+			
 			this.slipperiness = 0.72F;
 		}
 
@@ -41,6 +40,7 @@ namespace Everblaze.Environment.Tiles
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
 			Camera camera,
+			World world,
 			Int32 tileX,
 			Int32 tileZ)
 		{
@@ -73,11 +73,12 @@ namespace Everblaze.Environment.Tiles
 			if (tool is ShovelItem)
 			{
 				actionList.Add(new Gameplay.Actions.Action(Gameplay.Actions.Action.Operation.Cultivate, skills, tilePosition));
+				actionList.Add(new Gameplay.Actions.Action(Gameplay.Actions.Action.Operation.Dig, skills, tilePosition));
 			}
 
 			base.addActions(ref actionList, tilePosition, skills, tool);
 		}
-
+		
 
 		/// 
 		/// <summary>
@@ -85,17 +86,16 @@ namespace Everblaze.Environment.Tiles
 		/// </summary>
 		/// 
 		public override void onDig(
-			Random random,
 			SkillSet skills,
 			World world,
 			Int32 tileX,
 			Int32 tileZ)
 		{
-			world.replaceTile(tileX, tileZ, new DirtTile(random));
+			world.replaceTile(tileX, tileZ, new DirtTile());
 
-			world.player.inventory.items.Add(new DirtItem(Item.Material.None, (float)random.NextDouble() * skills.digging.level, 0.0F));
+			world.player.inventory.store(new DirtItem(Item.Material.None, (float)Program.random.NextDouble() * skills.digging.level, 0.0F));
 
-			base.onDig(random, skills, world, tileX, tileZ);
+			base.onDig(skills, world, tileX, tileZ);
 		}
 
 

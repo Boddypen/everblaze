@@ -14,14 +14,24 @@ namespace Everblaze.Resources
 			tileSlabTexture,
 			tileGrassTexture,
 			tileDirtTexture,
-			tileFarmlandTexture;
+			tileFarmlandTexture,
+			tileSandTexture,
+			tileWaterTexture;
+
+		public static Texture2D
+			itemsSpritesheet;
 
 		public static Texture2D
 			tileCursorTexture,
 			cursorTexture;
 
 		public static Texture2D
-			contextMenuTexture;
+			cloudsTexture;
+
+		public static Texture2D
+			contextMenuTexture,
+			inventoryWindowTexture,
+			selectedRowTexture;
 
 		public static Texture2D
 			whiteTexture;
@@ -39,17 +49,25 @@ namespace Everblaze.Resources
 		{
 
 			// Load tile textures.
-			tileSlabTexture = content.Load<Texture2D>("png/environment/tiles/slab");
-			tileGrassTexture = content.Load<Texture2D>("png/environment/tiles/grass");
-			tileDirtTexture = content.Load<Texture2D>("png/environment/tiles/dirt");
-			tileFarmlandTexture = content.Load<Texture2D>("png/environment/tiles/farmland");
+			tileSlabTexture			= content.Load<Texture2D>("png/environment/tiles/slab");
+			tileGrassTexture		= content.Load<Texture2D>("png/environment/tiles/grass");
+			tileDirtTexture			= content.Load<Texture2D>("png/environment/tiles/dirt");
+			tileFarmlandTexture		= content.Load<Texture2D>("png/environment/tiles/farmland");
+			tileSandTexture			= content.Load<Texture2D>("png/environment/tiles/sand");
+			tileWaterTexture		= content.Load<Texture2D>("png/environment/tiles/water");
 
-			tileCursorTexture = content.Load<Texture2D>("png/environment/tiles/cursor");
-			cursorTexture = content.Load<Texture2D>("png/interface/cursor");
+			itemsSpritesheet		= content.Load<Texture2D>("png/items/items");
 
-			contextMenuTexture = content.Load<Texture2D>("png/interface/action_menu");
+			tileCursorTexture		= content.Load<Texture2D>("png/environment/tiles/cursor");
+			cursorTexture			= content.Load<Texture2D>("png/interface/cursor");
 
-			whiteTexture = content.Load<Texture2D>("png/interface/white");
+			cloudsTexture			= content.Load<Texture2D>("png/environment/sky/clouds");
+
+			contextMenuTexture		= content.Load<Texture2D>("png/interface/action_menu");
+			inventoryWindowTexture	= content.Load<Texture2D>("png/interface/inventory");
+			selectedRowTexture		= content.Load<Texture2D>("png/interface/selected_row");
+
+			whiteTexture			= content.Load<Texture2D>("png/interface/white");
 
 		}
 

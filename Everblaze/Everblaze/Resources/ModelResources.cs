@@ -12,11 +12,24 @@ namespace Everblaze.Resources
 	public class ModelResources
 	{
 
+		// Debugging crap
 		public static Model
 			pointerModel;
 
+		// Environment
 		public static Model
 			treeModel;
+
+		// Items
+		public static Model
+			smallBarrelModel,
+			plankModel,
+			potatoModel,
+			branchModel,
+			dirtPileModel,
+			sandPileModel,
+			cornModel,
+			shovelModel;
 
 
 		/// 
@@ -33,7 +46,16 @@ namespace Everblaze.Resources
 			pointerModel = content.Load<Model>("fbx/debug/pointer");
 
 			treeModel = content.Load<Model>("fbx/environment/tree");
-			
+
+			smallBarrelModel = content.Load<Model>("fbx/items/small_barrel");
+			plankModel = content.Load<Model>("fbx/items/plank");
+			potatoModel = content.Load<Model>("fbx/items/potato");
+			branchModel = content.Load<Model>("fbx/items/branch");
+			dirtPileModel = content.Load<Model>("fbx/items/dirt_pile");
+			sandPileModel = content.Load<Model>("fbx/items/sand_pile");
+			cornModel = content.Load<Model>("fbx/items/corn");
+			shovelModel = content.Load<Model>("fbx/items/shovel");
+
 		}
 
 
@@ -56,9 +78,16 @@ namespace Everblaze.Resources
 			Vector3 scale)
 		{
 
-			Matrix view = Matrix.CreateLookAt(camera.position, camera.target, Vector3.Up);
+			Matrix view = Matrix.CreateLookAt(
+				camera.position,
+				camera.target,
+				Vector3.Up);
 
-			Matrix projection = Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(90.0F), 1920.0F / 1080.0F, 0.1F, 100.0F);
+			Matrix projection = Matrix.CreatePerspectiveFieldOfView(
+				MathHelper.ToRadians(90.0F),
+				1920.0F / 1080.0F,
+				0.1F,
+				2000.0F);
 			
 			Matrix world = 
 				Matrix.CreateScale(scale) *
@@ -80,6 +109,7 @@ namespace Everblaze.Resources
 					effect.LightingEnabled = true;
 					effect.PreferPerPixelLighting = false;
 					effect.DirectionalLight0.Enabled = true;
+					//TODO: Sunlight angle.
 					effect.DirectionalLight0.Direction = new Vector3(-0.5F, -5.0F, -1.5F);
 					effect.DirectionalLight0.DiffuseColor = new Vector3(0.25F);
 					effect.DirectionalLight0.SpecularColor = new Vector3(0.01F, 0.01F, 0.01F);

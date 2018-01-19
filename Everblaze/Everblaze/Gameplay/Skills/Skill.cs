@@ -67,10 +67,11 @@ namespace Everblaze.Gameplay.Skills
 		///		Increases the skill slightly.
 		/// </summary>
 		/// 
-		public virtual void increase(Random random, List<Notification> notifications)
+		public virtual void increase(
+			List<Notification> notifications)
 		{
 
-			float skillgain = (0.1F / ((level + 100.0F) / 100.0F) + (float)(random.NextDouble() * 0.01F)) * Skill.MULTIPLIER;
+			float skillgain = (0.1F / ((level + 100.0F) / 100.0F) + (float)(Program.random.NextDouble() * 0.01F)) * Skill.MULTIPLIER;
 			float previousLevel = this.level;
 
 			level += skillgain;

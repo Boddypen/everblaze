@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 
-using Microsoft.Xna.Framework;
-
 using Everblaze.Miscellaneous;
+
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+
 
 namespace Everblaze.Environment.Entities
 {
@@ -105,7 +106,6 @@ namespace Everblaze.Environment.Entities
 		/// </summary>
 		/// 
 		public virtual void update(
-			Random random,
 			World world)
 		{
 
@@ -114,7 +114,7 @@ namespace Everblaze.Environment.Entities
 			position.Z += velocity.Z;
 			position.Y = world.getHeightAtPoint(position.X, position.Z);
 
-			velocity *= world.getTileUnder(random, this.position).slipperiness;
+			velocity *= world.getTileUnder(this.position).slipperiness;
 			
 
 			// Update the entity's look target.
@@ -137,9 +137,7 @@ namespace Everblaze.Environment.Entities
 		/// 
 		public virtual void onDeath()
 		{
-
-
-
+			return;
 		}
 
 
@@ -152,9 +150,7 @@ namespace Everblaze.Environment.Entities
 			GraphicsDeviceManager graphics,
 			Camera camera)
 		{
-
-
-			
+			return;
 		}
 
 	}

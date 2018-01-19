@@ -4,7 +4,7 @@ using Microsoft.Xna.Framework;
 
 using Everblaze.Environment.Tiles;
 using Everblaze.Gameplay.Skills;
-
+using Everblaze.Environment.Items;
 
 namespace Everblaze.Gameplay.Actions
 {
@@ -71,7 +71,7 @@ namespace Everblaze.Gameplay.Actions
 		///		The type of target the action is targeting.
 		/// </summary>
 		public TargetType targetType;
-
+		
 		/// <summary>
 		///		The chance that the action will succeed upon completion.
 		/// </summary>
@@ -81,7 +81,11 @@ namespace Everblaze.Gameplay.Actions
 		///		If applicable, the tile in the world which this action targets.
 		/// </summary>
 		public Point tileTarget;
-		
+
+		/// <summary>
+		///		If applicable, the target item's hash code.
+		/// </summary>
+		public Item targetItem;
 
 		
 
@@ -93,6 +97,16 @@ namespace Everblaze.Gameplay.Actions
 			calculateChance(skills);
 
 			this.tileTarget = tileTarget;
+		}
+
+		public Action(Operation operation, SkillSet skills, ref Item targetItem)
+		{
+			this.operation = operation;
+			this.targetType = TargetType.Item;
+
+			calculateChance(skills);
+
+			this.targetItem = targetItem;
 		}
 
 

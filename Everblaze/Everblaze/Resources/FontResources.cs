@@ -32,7 +32,7 @@ namespace Everblaze.Resources
 			// Load fonts.
 			interfaceFont = content.Load<SpriteFont>("spritefont/interface");
 			notificationFont = content.Load<SpriteFont>("spritefont/notification");
-
+			
 		}
 
 

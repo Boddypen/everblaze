@@ -1,7 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+
+using Everblaze.Resources;
+
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
 
 namespace Everblaze.Environment.Items
 {
@@ -10,13 +13,32 @@ namespace Everblaze.Environment.Items
 		public PotatoItem(Material material, Single quality, Single damage) : base(material, quality, damage)
 		{
 
-			this.material = material;
-			this.quality = quality;
+			this.networkID = Item.NETWORK_POTATO;
+			
 			this.weight = 0.400F;
-			this.damage = damage;
+			this.volume = 0.300F;
 			this.name = "potato";
-			this.wooden = false;
 
+		}
+
+		public override String getDescription()
+		{
+			return "A small, starchy vegetable used in cooking.";
+		}
+
+		public override Model getModel()
+		{
+			return ModelResources.potatoModel;
+		}
+
+		public override Vector3 getCustomScaling()
+		{
+			return new Vector3(0.1F, 0.1F, 0.1F);
+		}
+
+		public override Rectangle getSpriteRectangle()
+		{
+			return new Rectangle(97, 1, 15, 15);
 		}
 	}
 }

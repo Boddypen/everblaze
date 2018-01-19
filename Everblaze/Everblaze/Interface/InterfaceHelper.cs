@@ -33,7 +33,8 @@ namespace Everblaze.Interface
 		public static void drawWindow(
 			SpriteBatch spriteBatch,
 			Rectangle window,
-			float opacity)
+			float opacity,
+			float depth)
 		{
 
 			spriteBatch.Draw(
@@ -44,7 +45,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -54,7 +55,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -64,7 +65,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -74,7 +75,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -84,7 +85,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -94,7 +95,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -104,7 +105,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,
@@ -114,7 +115,7 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 			spriteBatch.Draw(
 				TextureResources.whiteTexture,
@@ -124,15 +125,19 @@ namespace Everblaze.Interface
 				0.0F,
 				Vector2.Zero,
 				SpriteEffects.None,
-				0.5F);
+				depth);
 
 		}
 
 
-		public static void drawWindowWithArrow(SpriteBatch spriteBatch, Rectangle window, float opacity)
+		public static void drawWindowWithArrow(
+			SpriteBatch spriteBatch,
+			Rectangle window,
+			float opacity,
+			float depth)
 		{
 
-			drawWindow(spriteBatch, window, opacity);
+			drawWindow(spriteBatch, window, opacity, depth);
 
 			spriteBatch.Draw(
 				TextureResources.contextMenuTexture,

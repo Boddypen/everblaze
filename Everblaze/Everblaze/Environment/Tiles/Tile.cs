@@ -9,6 +9,8 @@ using Everblaze.Gameplay.Actions;
 using Everblaze.Gameplay.Skills;
 using Everblaze.Environment.Items;
 using Lidgren.Network;
+using Everblaze.Resources;
+using System.IO;
 
 namespace Everblaze.Environment.Tiles
 {
@@ -40,13 +42,14 @@ namespace Everblaze.Environment.Tiles
 		///		Unit: <c>m</c>
 		/// </summary>
 		public const float HEIGHT_STEP = 0.20F;
-		
+
 		// Network identifiers for different types of tiles.
 		public const int
 			NETWORK_DIRT = 1,
 			NETWORK_GRASS = 2,
 			NETWORK_TREE = 3,
-			NETWORK_FARMLAND = 4;
+			NETWORK_FARMLAND = 4,
+			NETWORK_SAND = 5;
 
 		public int networkID;
 
@@ -172,8 +175,7 @@ namespace Everblaze.Environment.Tiles
 		public Boolean fruitful = true;
 
 		/// <summary>
-		///		Whether or not the tile is allowed to be affected by
-		///		a digging action.
+		///		Whether or not a digging action can be performed on this tile.
 		/// </summary>
 		public Boolean diggable = true;
 
@@ -183,9 +185,7 @@ namespace Everblaze.Environment.Tiles
 		///		Initializes a new instance of the <see cref="Tile"/> class.
 		/// </summary>
 		/// 
-		/// <param name="random">A random number generator.</param>
-		/// 
-		public Tile(Random random)
+		public Tile()
 		{
 
 			this.heights = new int[4];
@@ -212,34 +212,12 @@ namespace Everblaze.Environment.Tiles
 		/// </returns>
 		/// 
 		public static Tile readFromNetwork(
-			Random random,
 			ref NetIncomingMessage message)
 		{
 
-			// Create a default tile.
-			Tile tile = new Tile(random);
+			// Create the tile object to start with.
+			Tile tile = Tile.readFromID(message.ReadInt32());
 			
-			// Determine what the tile is.
-			switch(message.ReadInt32())
-			{
-				case NETWORK_GRASS:
-					tile = new GrassTile(random);
-					break;
-
-				case NETWORK_DIRT:
-					tile = new DirtTile(random);
-					break;
-
-				case NETWORK_TREE:
-					tile = new TreeTile(random);
-					break;
-
-				case NETWORK_FARMLAND:
-					tile = new FarmlandTile(random);
-					break;
-			}
-
-			Console.WriteLine("RECEIVING A {0} TILE.", tile.getName());
 
 			// Set the correct heights for the tile.
 			tile.heights = new int[]
@@ -252,8 +230,99 @@ namespace Everblaze.Environment.Tiles
 
 
 			// Load custom properties.
-			tile.readCustomProperties(ref message);
+			tile.readCustomNetworkProperties(ref message);
 
+
+			return tile;
+		}
+
+
+		public static Tile readFromFile(
+			String filePath)
+		{
+
+			// Read the file's data.
+			String[] fileData = File.ReadAllLines(filePath);
+
+
+			// Create the tile object to start with.
+			Tile tile = Tile.readFromID(int.Parse(fileData[0]));
+
+			String[] heightData = fileData[1].Split((char)0xFF);
+			tile.heights = new int[]
+			{
+				int.Parse(heightData[0]),
+				int.Parse(heightData[1]),
+				int.Parse(heightData[2]),
+				int.Parse(heightData[3])
+			};
+
+
+			tile.readCustomFileProperties(fileData[2].Split((char)0xFF));
+
+			return tile;
+		}
+
+
+		public static void writeToFile(
+			String filePath,
+			Tile tile)
+		{
+			String heightData = tile.heights[0].ToString() + (char)0xFF
+							  + tile.heights[1].ToString() + (char)0xFF
+							  + tile.heights[2].ToString() + (char)0xFF
+							  + tile.heights[3].ToString();
+
+
+			String[] fileData = new String[]
+			{
+				tile.networkID.ToString(),
+				heightData,
+				tile.getCustomFileProperties()
+			};
+
+			File.WriteAllLines(filePath, fileData);
+		}
+
+
+		/// 
+		/// <summary>
+		///		Gets a <see cref="Tile"/> object which is the correct <c>type</c>,
+		///		based on the specified Network ID.
+		/// </summary>
+		/// 
+		/// <param name="networkID">The network identifier of the tile.</param>
+		/// 
+		/// <returns>
+		///		A <see cref="Tile"/> of any type.
+		/// </returns>
+		/// 
+		public static Tile readFromID(int networkID)
+		{
+			Tile tile = new Tile();
+
+			switch(networkID)
+			{
+				case NETWORK_GRASS:
+					tile = new GrassTile();
+					break;
+
+				case NETWORK_DIRT:
+					tile = new DirtTile();
+					break;
+
+				case NETWORK_TREE:
+					tile = new TreeTile();
+					break;
+
+				case NETWORK_FARMLAND:
+					tile = new FarmlandTile();
+					break;
+
+				case NETWORK_SAND:
+					tile = new SandTile();
+					break;
+			}
 
 			return tile;
 		}
@@ -266,7 +335,20 @@ namespace Everblaze.Environment.Tiles
 		/// 
 		/// <param name="message">The <see cref="NetIncomingMessage"/> reveived.</param>
 		/// 
-		public virtual void readCustomProperties(ref NetIncomingMessage message)
+		public virtual void readCustomNetworkProperties(ref NetIncomingMessage message)
+		{
+			return;
+		}
+
+
+		/// 
+		/// <summary>
+		///		Reads any custom properties from the data of a tile file.
+		/// </summary>
+		/// 
+		/// <param name="customProperties">The custom tile file data, as a <see cref="String"/> array.</param>
+		/// 
+		public virtual void readCustomFileProperties(String[] customProperties)
 		{
 			return;
 		}
@@ -283,6 +365,21 @@ namespace Everblaze.Environment.Tiles
 		{
 			return;
 		}
+
+
+		/// 
+		/// <summary>
+		///		Gets the custom properties to be written to a tile file.
+		/// </summary>
+		/// 
+		/// <returns>
+		///		A <see cref="String"/> to be written to the file.
+		/// </returns>
+		/// 
+		public virtual String getCustomFileProperties()
+		{
+			return "";
+		}
 		
 
 		/// 
@@ -296,7 +393,7 @@ namespace Everblaze.Environment.Tiles
 		/// <param name="tool">The <see cref="Item"/> currently equipped by the player when activating the tile.</param>
 		///
 		public virtual void addActions(
-			ref List<Everblaze.Gameplay.Actions.Action> actionList,
+			ref List<Gameplay.Actions.Action> actionList,
 			Point tilePosition,
 			SkillSet skills,
 			Item tool)
@@ -420,7 +517,7 @@ namespace Everblaze.Environment.Tiles
 		/// 
 		public virtual void update()
 		{
-
+			return;
 		}
 
 
@@ -431,7 +528,7 @@ namespace Everblaze.Environment.Tiles
 		/// 
 		public virtual void steppedOn()
 		{
-
+			return;
 		}
 
 
@@ -441,13 +538,12 @@ namespace Everblaze.Environment.Tiles
 		/// </summary>
 		/// 
 		public virtual void onDig(
-			Random random,
 			SkillSet skills,
 			World world,
 			int tileX,
 			int tileZ)
 		{
-			
+			return;
 		}
 
 
@@ -463,7 +559,7 @@ namespace Everblaze.Environment.Tiles
 			int tileX,
 			int tileZ)
 		{
-			
+			return;
 		}
 
 
@@ -478,10 +574,11 @@ namespace Everblaze.Environment.Tiles
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
 			Camera camera,
+			World world,
 			int tileX,
 			int tileZ)
 		{
-
+			return;
 		}
 
 
@@ -490,16 +587,14 @@ namespace Everblaze.Environment.Tiles
 		///		Returns a random tile corner.
 		/// </summary>
 		/// 
-		/// <param name="random">A random number generator.</param>
-		/// 
 		/// <returns>
 		///		A random corner for use with all world tiles.
 		/// </returns>
 		/// 
-		public static TileCorner getRandomCorner(Random random)
+		public static TileCorner getRandomCorner()
 		{
 			// Create a random number.
-			int randomNumber = random.Next(4);
+			int randomNumber = Program.random.Next(4);
 
 			// Based on the random number, decide on a tile corner.
 			switch(randomNumber)
@@ -528,6 +623,7 @@ namespace Everblaze.Environment.Tiles
 		/// <param name="tileZ">The tile's Z position in the world..</param>
 		/// <param name="heights">The heightmap of the tile.</param>
 		/// <param name="tileTexture">The <see cref="Texture2D"/> to use when drawing the top of the tile.</param>
+		/// 
 		public static void renderTile(
 			GraphicsDeviceManager graphics,
 			BasicEffect effect,
@@ -539,25 +635,31 @@ namespace Everblaze.Environment.Tiles
 			float heightOffset)
 		{
 			
-			effect.View = Matrix.CreateLookAt(
-				camera.position,
-				camera.target,
-				Vector3.Up);
-
-			effect.Projection = Matrix.CreatePerspectiveFieldOfView(
-				MathHelper.ToRadians(90.0F),
-				1920.0F / 1080.0F,
-				0.1F,
-				100.0F);
-
-			effect.World = Matrix.CreateTranslation(
-				tileX * Tile.TILE_WIDTH,	// X
-				heightOffset,				// Y
-				tileZ * Tile.TILE_WIDTH);	// Z
-
+			RenderHelper.setupEffect(
+				ref effect,
+				camera,
+				1.0F,
+				new Vector3(
+					tileX * Tile.TILE_WIDTH,
+					heightOffset,
+					tileZ * Tile.TILE_WIDTH));
 			
+
 			effect.TextureEnabled = true;
 			effect.Texture = tileTexture;
+
+			
+			// Pulse Effect
+			if(tileTexture.Equals(TextureResources.tileCursorTexture))
+			{
+				effect.Alpha = 0.5F + ((float)Math.Sin(((float)DateTime.Now.Millisecond / 1000.0F) * Math.PI) / 2.0F);
+
+				Console.WriteLine(effect.Alpha + " (" + DateTime.Now.Ticks + ")");
+			}
+			else
+			{
+				effect.Alpha = 1.0F;
+			}
 
 
 			//// FOG
@@ -585,13 +687,82 @@ namespace Everblaze.Environment.Tiles
 			}
 
 		}
+		
+
+		public static void renderTileDecoration(
+			GraphicsDeviceManager graphics,
+			BasicEffect effect,
+			Camera camera)
+		{
+			
+			//RenderHelper.setupEffect(
+			//	ref effect,
+			//	camera,
+			//	1.0F,
+			//	)
+
+		}
+
+
+		public static void renderClouds(
+			GraphicsDeviceManager graphics,
+			BasicEffect effect,
+			Camera camera)
+		{
+
+			RenderHelper.setupEffect(
+				ref effect,
+				camera,
+				2000.0F,
+				camera.position + new Vector3(-1000.0F, 200.0F, -1000.0F));
+			
+
+			effect.TextureEnabled = true;
+			effect.Texture = TextureResources.cloudsTexture;
+			
+			effect.LightingEnabled = false;
+
+			foreach (var pass in effect.CurrentTechnique.Passes)
+			{
+				pass.Apply();
+
+				graphics.GraphicsDevice.DrawUserPrimitives(
+					PrimitiveType.TriangleList,
+					generateCloudsPrimitives(),
+					0,
+					2);
+			}
+		}
+
+
+		public static VertexPositionTexture[] generateCloudsPrimitives()
+		{
+			VertexPositionTexture[] cloudsVertices = new VertexPositionTexture[6];
+			cloudsVertices[0].Position = new Vector3(1.0F, 0.0F, 1.0F);
+			cloudsVertices[1].Position = new Vector3(1.0F, 0.0F, 0.0F);
+			cloudsVertices[2].Position = new Vector3(0.0F, 0.0F, 0.0F);
+
+			cloudsVertices[3].Position = new Vector3(0.0F, 0.0F, 1.0F);
+			cloudsVertices[4].Position = new Vector3(1.0F, 0.0F, 1.0F);
+			cloudsVertices[5].Position = new Vector3(0.0F, 0.0F, 0.0F);
+
+			cloudsVertices[0].TextureCoordinate = new Vector2(1.0F, 1.0F);
+			cloudsVertices[1].TextureCoordinate = new Vector2(1.0F, 0.0F);
+			cloudsVertices[2].TextureCoordinate = new Vector2(0.0F, 0.0F);
+
+			cloudsVertices[3].TextureCoordinate = new Vector2(0.0F, 1.0F);
+			cloudsVertices[4].TextureCoordinate = new Vector2(1.0F, 1.0F);
+			cloudsVertices[5].TextureCoordinate = new Vector2(0.0F, 0.0F);
+
+			return cloudsVertices;
+		}
 
 
 		/// 
 		/// <summary>
 		///		Calculates the tile vertices, after supplied with a heightmap.
-		///		This needs to be used due to the funny-looking heightmaps which
-		///		are utilised in this game.
+		///		This method must be used due to the unique-looking heightmaps
+		///		which this game uses.
 		/// </summary>
 		/// 
 		/// <param name="heights">A tile's heightmap.</param>

@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Everblaze.Resources;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace Everblaze.Environment.Items
 {
@@ -19,8 +22,12 @@ namespace Everblaze.Environment.Items
 			float quality,
 			float damage) : base(material, quality, damage)
 		{
+
+			this.networkID = Item.NETWORK_PLANK;
+
 			this.quality = quality;
 			this.weight = 2.0F;
+			this.volume = 3.0F;
 			this.damage = damage;
 
 			this.name = "plank";
@@ -29,6 +36,22 @@ namespace Everblaze.Environment.Items
 
 			this.wooden = true;
 		}
-		
+
+
+		public override Model getModel()
+		{
+			return ModelResources.plankModel;
+		}
+
+		public override Vector3 getCustomScaling()
+		{
+			return new Vector3(1.0F, 0.05F, 0.25F);
+		}
+
+		public override Rectangle getSpriteRectangle()
+		{
+			return new Rectangle(81, 1, 15, 15);
+		}
+
 	}
 }

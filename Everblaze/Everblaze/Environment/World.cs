@@ -6,10 +6,13 @@ using Everblaze.Environment.Entities;
 using Everblaze.Environment.Items;
 using Everblaze.Environment.Tiles;
 using Everblaze.Miscellaneous;
+using Everblaze.Resources;
 
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+
+using static Everblaze.Game;
 
 
 namespace Everblaze.Environment
@@ -29,14 +32,20 @@ namespace Everblaze.Environment
 		public Tile[,] tiles;
 
 		/// <summary>
-		///		The width of the world, along the X axis.
+		///		The width of the world in tiles, along the X axis.
 		/// </summary>
 		public int width;
 
 		/// <summary>
-		///		The height/depth of the world, along the Z axis.
+		///		The height/depth of the world in tiles, along the Z axis.
 		/// </summary>
 		public int height;
+
+
+		/// <summary>
+		///		The list of items which are on the ground in the world.
+		/// </summary>
+		public List<Item> items;
 
 		
 		/// <summary>
@@ -59,19 +68,21 @@ namespace Everblaze.Environment
 		/// <param name="width">The width of the world, in tiles, measured along the X axis.</param>
 		/// <param name="height">The height of the world, in tiles, measured along the Z axis.</param>
 		/// 
-		public World(Random random, int width, int height)
+		public World(int width, int height)
 		{
-
+			
 			this.tiles = new Tile[width, height];
 
 			this.width = width;
 			this.height = height;
 
+			this.items = new List<Item>();
+
 			this.player = new Player();
 			this.player.position = new Vector3(
-				(float)random.NextDouble() * (Tile.TILE_WIDTH * width),
+				(float)Program.random.NextDouble() * (Tile.TILE_WIDTH * width),
 				0.0F,
-				(float)random.NextDouble() * (Tile.TILE_WIDTH * height));
+				(float)Program.random.NextDouble() * (Tile.TILE_WIDTH * height));
 
 		}
 
@@ -84,26 +95,34 @@ namespace Everblaze.Environment
 		/// <param name="k">The current keyboard state.</param>
 		/// 
 		public void update(
-			Random random,
+			GameSide gameSide,
 			KeyboardState k,
 			Vector2 lookMovement)
 		{
 			
-
-			// Update the player.
-			this.player.update(random, this, k, lookMovement);
-
-			// Perform nature ticks.
-			if(natureTickCounter >= 54000)
+			
+			switch(gameSide)
 			{
-				natureTickCounter = 0;
-				natureTick();
+				case GameSide.Client:
+
+					// Update the player.
+					this.player.update(this, k, lookMovement);
+
+					break;
+
+				case GameSide.Server:
+					
+					// Perform nature ticks.
+					if (natureTickCounter >= 54000)
+					{
+						natureTickCounter = 0;
+						natureTick();
+					}
+					natureTickCounter++;
+
+					break;
 			}
-
-
-			// Update all counters.
-			natureTickCounter++;
-
+			
 		}
 
 
@@ -128,11 +147,11 @@ namespace Everblaze.Environment
 		}
 
 
-		public Tile getTileUnder(Random random, Vector3 position)
+		public Tile getTileUnder(Vector3 position)
 		{
 			if (position.X < 0.0F || position.X >= Tile.TILE_WIDTH * width
 				|| position.Z < 0.0F || position.Z >= Tile.TILE_WIDTH * height)
-				return new Tile(random);
+				return new Tile();
 
 			return this.tiles[
 				(int)Math.Floor(position.X / Tile.TILE_WIDTH),
@@ -145,50 +164,54 @@ namespace Everblaze.Environment
 		///		Randomly generates the world.
 		/// </summary>
 		/// 
-		public void generate(Random random)
+		public void generate()
 		{
 
+			// Generate a heightmap.
+			float[,] heightmap = new float[width, height];
+			
+			// Generate a noise system to create the world.
+			FastNoise f = new FastNoise();
+			f.SetNoiseType(FastNoise.NoiseType.Simplex);
+			f.SetFrequency(0.05F);
+			f.SetFractalOctaves(15);
+			f.SetFractalLacunarity(10.0F);
+			f.SetFractalGain(1.0F);
+
+			// For each tile int the world, set its height according to the noise generated previously.
+			for(int x = 0; x < width; x++)
+				for(int z = 0; z < height; z++)
+					heightmap[x, z] = (f.GetPerlin((float)x, (float)z) + 0.4F) * 100.0F;
+
+
 			// Generate tiles.
+			for (int x = 0; x < width; x++)
+				for (int z = 0; z < height; z++)
+					this.tiles[x, z] = new GrassTile();
+
+
+			// Randomise heights.
+			for (int x = 1; x < width - 1; x++)
+				for (int z = 1; z < height - 1; z++)
+					this.changeHeight(x, z, Tile.TileCorner.BottomRight, (int)heightmap[x, z] + Program.random.Next(3));
+
+
+			// Re-do tiles.
 			for (int x = 0; x < width; x++)
 			{
 				for (int z = 0; z < height; z++)
 				{
-					this.tiles[x, z] = new GrassTile(random);
-				}
-			}
+					float tileAverageHeight = this.tiles[x, z].getAverageHeight();
 
-			// Randomise heights.
-			for (int x = 1; x < width - 1; x++)
-			{
-				for (int z = 1; z < height - 1; z++)
-				{
-					this.changeHeight(x, z, Tile.TileCorner.BottomRight,
-						((this.getHeight(x - 1, z, Tile.TileCorner.BottomRight) + this.getHeight(x, z - 1, Tile.TileCorner.BottomRight)) / 2) + random.Next(-3, 5));
-
-					if (random.Next(30) == 0)
-						this.changeHeight(x, z, Tile.TileCorner.TopLeft, random.Next(-7, 7));
-				}
-			}
-
-			// Re-do tiles.
-			for(int x = 0; x < width; x++)
-			{
-				for (int z = 0; z < height; z++)
-				{
-					float tileAverageHeight
-						= this.getHeightAtPoint(
-							(x * Tile.TILE_WIDTH) + (Tile.TILE_WIDTH / 2.0F),
-							(z * Tile.TILE_WIDTH) + (Tile.TILE_WIDTH / 2.0F));
-
-					if(tileAverageHeight < 0.0F)
+					if(tileAverageHeight <= 3.0F)
 					{
-						replaceTile(x, z, new DirtTile(random));
+						replaceTile(x, z, new SandTile());
 					}
 
 
 					if (tiles[x, z].GetType().Equals(typeof(GrassTile))
-						&& random.Next(10) == 0)
-						replaceTile(x, z, new TreeTile(random));
+						&& Program.random.Next(10) == 0)
+						replaceTile(x, z, new TreeTile());
 
 				}
 			}
@@ -317,6 +340,147 @@ namespace Everblaze.Environment
 				return 0.0F;
 			}
 
+
+			float[] heightmap = new float[4];
+			Boolean flipped = getQuadrantHeightmap(positionX, positionZ, ref heightmap);
+
+			int tileX = (int)(positionX / Tile.TILE_WIDTH);
+			int tileZ = (int)(positionZ / Tile.TILE_WIDTH);
+
+			float tilePositionX = (positionX - (float)(tileX * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
+			float tilePositionZ = (positionZ - (float)(tileZ * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
+
+			// Determine the height of the point.
+			float height = 0.0F;
+
+			float sqX = (tilePositionX < 0.5F ? tilePositionX * 2.0F : ((tilePositionX - 0.5F) * 2.0F));
+			float sqZ = (tilePositionZ < 0.5F ? tilePositionZ * 2.0F : ((tilePositionZ - 0.5F) * 2.0F));
+			
+			if(flipped)
+			{
+				if(sqX < sqZ)
+				{
+					height = heightmap[2];
+
+					height += (heightmap[3] - heightmap[2]) * sqX;
+					height += (heightmap[0] - heightmap[2]) * (1.0F - sqZ);
+				}
+				else
+				{
+					height = heightmap[1];
+
+					height += (heightmap[0] - heightmap[1]) * (1.0F - sqX);
+					height += (heightmap[3] - heightmap[1]) * sqZ;
+				}
+			}
+			else
+			{
+				if (sqX + sqZ < 1.0F)
+				{
+					height = heightmap[0];
+
+					height += (heightmap[1] - heightmap[0]) * sqX;
+					height += (heightmap[2] - heightmap[0]) * sqZ;
+				}
+				else
+				{
+					height = heightmap[3];
+
+					height += (heightmap[1] - heightmap[3]) * (1.0F - sqZ);
+					height += (heightmap[2] - heightmap[3]) * (1.0F - sqX);
+				}
+			}
+
+			return height;
+
+		}
+
+		//public Vector3 getNormalAtPoint(
+		//	float positionX,
+		//	float positionZ)
+		//{
+
+		//	// Get the heightmap of the point.
+		//	float[] heightmap = new float[4];
+		//	Boolean flipped = this.getQuadrantHeightmap(positionX, positionZ, ref heightmap);
+
+		//	// Calculate position on the tile...
+		//	float tilePositionX = (positionX - (float)((int)(positionX / Tile.TILE_WIDTH) * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
+		//	float tilePositionZ = (positionZ - (float)((int)(positionZ / Tile.TILE_WIDTH) * Tile.TILE_WIDTH)) / Tile.TILE_WIDTH;
+
+
+		//	float sqX = (tilePositionX < 0.5F ? tilePositionX * 2.0F : ((tilePositionX - 0.5F) * 2.0F));
+		//	float sqZ = (tilePositionZ < 0.5F ? tilePositionZ * 2.0F : ((tilePositionZ - 0.5F) * 2.0F));
+
+		//	float averageHeight = this.getHeightAtPoint(
+		//		(int)(positionX / Tile.TILE_WIDTH) + (Tile.TILE_WIDTH / 2.0F),
+		//		(int)(positionZ / Tile.TILE_WIDTH) + (Tile.TILE_WIDTH / 2.0F));
+
+		//	VertexPositionNormalTexture[] vpnt = Tile.calculateTileVertices(this.tiles[tileX, tileZ].heights);
+
+		//	if (flipped)
+		//	{
+		//		if (sqX < sqZ)
+		//		{
+		//			// 0, 2, 3
+		//			return vpnt
+		//		}
+		//		else
+		//		{
+		//			// 0, 1, 3
+		//		}
+		//	}
+		//	else
+		//	{
+		//		if (sqX + sqZ < 1.0F)
+		//		{
+		//			// 0, 1, 2
+		//		}
+		//		else
+		//		{
+		//			// 1, 2, 3
+		//		}
+		//	}
+			
+		//}
+
+
+		/// 
+		/// <summary>
+		///		Gets the quadrant heightmap.
+		/// </summary>
+		/// 
+		/// <param name="positionX">The position x.</param>
+		/// <param name="positionZ">The position z.</param>
+		/// <param name="flipped">if set to <c>true</c> [flipped].</param>
+		/// <param name="tilePositionX">The tile position x.</param>
+		/// <param name="tilePositionZ">The tile position z.</param>
+		/// 
+		/// <returns>
+		///		Whether or not the quadrant is 'flipped'.
+		/// </returns>
+		/// 
+		private Boolean getQuadrantHeightmap(
+			float positionX,
+			float positionZ,
+			ref float[] heightmap)
+		{
+			
+			// Generate the float array.
+			heightmap = new float[4] { 0.0F, 0.0F, 0.0F, 0.0F };
+			
+
+			// If the position is outside of the world...
+			if(    positionX < 0.0F
+				|| positionZ < 0.0F
+				|| positionX >= Tile.TILE_WIDTH * this.width
+				|| positionZ >= Tile.TILE_WIDTH * this.height)
+			{
+				// Return the hightmap as it is, with no important values.
+				return false;
+			}
+
+
 			// Determine the tile the point is on top of.
 			int tileX = (int)(positionX / Tile.TILE_WIDTH);
 			int tileZ = (int)(positionZ / Tile.TILE_WIDTH);
@@ -331,95 +495,42 @@ namespace Everblaze.Environment
 			else if (tilePositionX >= 0.5F && tilePositionZ < 0.5F) currentCorner = Tile.TileCorner.TopRight;
 			else if (tilePositionX < 0.5F && tilePositionZ >= 0.5F) currentCorner = Tile.TileCorner.BottomLeft;
 			else if (tilePositionX >= 0.5F && tilePositionZ >= 0.5F) currentCorner = Tile.TileCorner.BottomRight;
-			
+
 
 			// Now we need to find the heightmap of the quadrant we're on.
-			float
-				triZ0 = 0.0F,
-				triZ1 = 0.0F,
-				triZ2 = 0.0F,
-				triZ3 = 0.0F;
-			Boolean flipped = false;
 			switch (currentCorner)
 			{
 				case Tile.TileCorner.TopLeft:
-					triZ0 = getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) * Tile.HEIGHT_STEP;
-					triZ1 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.TopRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ2 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ3 = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
-					flipped = true;
-					//Console.WriteLine("On the top-left quadrant.");
-					break;
+					heightmap[0] = getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) * Tile.HEIGHT_STEP;
+					heightmap[1] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.TopRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[2] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[3] = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
+					return true;
 
 				case Tile.TileCorner.TopRight:
-					triZ0 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.TopRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ1 = getHeight(tileX, tileZ, Tile.TileCorner.TopRight) * Tile.HEIGHT_STEP;
-					triZ2 = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
-					triZ3 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopRight) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					//Console.WriteLine("On the top-right quadrant.");
-					break;
+					heightmap[0] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.TopRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[1] = getHeight(tileX, tileZ, Tile.TileCorner.TopRight) * Tile.HEIGHT_STEP;
+					heightmap[2] = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
+					heightmap[3] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopRight) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					return false;
 
 				case Tile.TileCorner.BottomLeft:
-					triZ0 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ1 = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
-					triZ2 = getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) * Tile.HEIGHT_STEP;
-					triZ3 = ((getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					//Console.WriteLine("On the bottom-left quadrant.");
-					break;
+					heightmap[0] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[1] = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
+					heightmap[2] = getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) * Tile.HEIGHT_STEP;
+					heightmap[3] = ((getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					return false;
 
 				case Tile.TileCorner.BottomRight:
-					triZ0 = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
-					triZ1 = ((getHeight(tileX, tileZ, Tile.TileCorner.TopRight) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ2 = ((getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
-					triZ3 = getHeight(tileX, tileZ, Tile.TileCorner.BottomRight) * Tile.HEIGHT_STEP;
-					flipped = true;
-					//Console.WriteLine("On the bottom-right quadrant.");
-					break;
+					heightmap[0] = tiles[tileX, tileZ].getAverageHeight() * Tile.HEIGHT_STEP;
+					heightmap[1] = ((getHeight(tileX, tileZ, Tile.TileCorner.TopRight) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[2] = ((getHeight(tileX, tileZ, Tile.TileCorner.BottomLeft) + getHeight(tileX, tileZ, Tile.TileCorner.BottomRight)) / 2.0F) * Tile.HEIGHT_STEP;
+					heightmap[3] = getHeight(tileX, tileZ, Tile.TileCorner.BottomRight) * Tile.HEIGHT_STEP;
+					return true;
+
+				default:
+					return false;
 			}
-			
-
-			// Determine the height of the point.
-			float height = 0.0F;
-
-			float sqX = (tilePositionX < 0.5F ? tilePositionX * 2.0F : ((tilePositionX - 0.5F) * 2.0F));
-			float sqZ = (tilePositionZ < 0.5F ? tilePositionZ * 2.0F : ((tilePositionZ - 0.5F) * 2.0F));
-			
-			if(flipped)
-			{
-				if(sqX < sqZ)
-				{
-					height = triZ2;
-
-					height += (triZ3 - triZ2) * sqX;
-					height += (triZ0 - triZ2) * (1.0F - sqZ);
-				}
-				else
-				{
-					height = triZ1;
-
-					height += (triZ0 - triZ1) * (1.0F - sqX);
-					height += (triZ3 - triZ1) * sqZ;
-				}
-			}
-			else
-			{
-				if (sqX + sqZ < 1.0F)
-				{
-					height = triZ0;
-
-					height += (triZ1 - triZ0) * sqX;
-					height += (triZ2 - triZ0) * sqZ;
-				}
-				else
-				{
-					height = triZ3;
-
-					height += (triZ1 - triZ3) * (1.0F - sqZ);
-					height += (triZ2 - triZ3) * (1.0F - sqX);
-				}
-			}
-
-			return height;
 
 		}
 
@@ -566,16 +677,57 @@ namespace Everblaze.Environment
 			Camera camera)
 		{
 
-			for (int x = 0; x < width; x++)
-				for (int z = 0; z < height; z++)
+			int range = 32;
+
+			int minX = (int)((player.position.X / Tile.TILE_WIDTH) - range);
+			int minZ = (int)((player.position.Z / Tile.TILE_WIDTH) - range);
+			int maxX = (int)((player.position.X / Tile.TILE_WIDTH) + range);
+			int maxZ = (int)((player.position.Z / Tile.TILE_WIDTH) + range);
+
+			if (minX < 0) minX = 0;
+			if (minZ < 0) minZ = 0;
+			if (maxX >= width) maxX = width - 1;
+			if (maxZ >= height) maxZ = height - 1;
+
+			for (int x = minX; x <= maxX; x++)
+				for (int z = minZ; z <= maxZ; z++)
 				{
 					this.tiles[x, z].draw(
 						graphics,
 						effect,
 						camera,
+						this,
 						x,
 						z);
 				}
+
+
+			// Draw the items in the world.
+			foreach(Item item in items)
+			{
+				// Don't draw the item if no model is returned...
+				if (item.getModel() == null) continue;
+
+
+				Vector3 itemPosition = new Vector3(
+					item.position.X,
+					this.getHeightAtPoint(item.position.X, item.position.Y),
+					item.position.Y);
+
+				//TODO: Rotate the item based on the position normal.
+
+				ModelResources.renderModel(
+					item.getModel(),
+					camera,
+					itemPosition,
+					new Vector3(0.0F, item.rotation, 0.0F),
+					item.getCustomScaling());
+
+			}
+
+
+			// Draw the clouds
+			Tile.renderClouds(graphics, effect, camera);
 
 		}
 
